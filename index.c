@@ -722,7 +722,7 @@ static int main_change_folder(struct Menu *menu, int op, struct Mailbox *m,
     *pager_return = false;
 
   /* keepalive failure in mutt_enter_fname may kill connection. */
-  if (Context && Context->mailbox && (mutt_buffer_is_empty(&Context->mailbox->pathbuf)))
+  if (Context && Context->mailbox && !Context->mailbox->path->orig)
     ctx_free(&Context);
 
   if (Context && Context->mailbox)
@@ -732,8 +732,8 @@ static int main_change_folder(struct Menu *menu, int op, struct Mailbox *m,
     int monitor_remove_rc = mutt_monitor_remove(NULL);
 #endif
 #ifdef USE_COMP_MBOX
-    if (Context->mailbox->compress_info && (Context->mailbox->realpath[0] != '\0'))
-      new_last_folder = mutt_str_strdup(Context->mailbox->realpath);
+    if (Context->mailbox->compress_info && (Context->mailbox->path->canon[0] != '\0'))
+      new_last_folder = mutt_str_strdup(Context->mailbox->path->canon);
     else
 #endif
       new_last_folder = mutt_str_strdup(mailbox_path(Context->mailbox));
@@ -768,7 +768,7 @@ static int main_change_folder(struct Menu *menu, int op, struct Mailbox *m,
     // TODO: Refactor this function to avoid the need for an observer
     notify_observer_add(m->notify, mailbox_index_observer, &m);
   }
-  mutt_folder_hook(buf, m ? m->name : NULL);
+  mutt_folder_hook(buf, m ? m->path->desc : NULL);
   if (m)
   {
     /* `m` is still valid, but we won't need the observer again before the end
@@ -1208,7 +1208,7 @@ int mutt_index_menu(struct MuttWindow *dlg)
       int check = mx_mbox_check(Context->mailbox, &index_hint);
       if (check < 0)
       {
-        if (!Context->mailbox || (mutt_buffer_is_empty(&Context->mailbox->pathbuf)))
+        if (!Context->mailbox || !Context->mailbox->path->orig)
         {
           /* fatal error occurred */
           ctx_free(&Context);
@@ -2070,8 +2070,7 @@ int mutt_index_menu(struct MuttWindow *dlg)
         }
 
         /* check for a fatal error, or all messages deleted */
-        if (Context && Context->mailbox &&
-            mutt_buffer_is_empty(&Context->mailbox->pathbuf))
+        if (Context && Context->mailbox && !Context->mailbox->path->orig)
           ctx_free(&Context);
 
         /* if we were in the pager, redisplay the message */
@@ -2315,7 +2314,7 @@ int mutt_index_menu(struct MuttWindow *dlg)
         {
           // Create mailbox and set name.
           struct Mailbox *m_new_vfolder = mx_path_resolve(buf);
-          m_new_vfolder->name = query_unencoded;
+          mutt_str_replace(&m_new_vfolder->path->desc, query_unencoded);
           query_unencoded = NULL;
 
           main_change_folder(menu, op, m_new_vfolder, buf, sizeof(buf),
@@ -2414,8 +2413,8 @@ int mutt_index_menu(struct MuttWindow *dlg)
         else
           cp = _("Open mailbox");
 
-        if ((op == OP_MAIN_NEXT_UNREAD_MAILBOX) && Context && Context->mailbox &&
-            !mutt_buffer_is_empty(&Context->mailbox->pathbuf))
+        if ((op == OP_MAIN_NEXT_UNREAD_MAILBOX) && Context &&
+            Context->mailbox && Context->mailbox->path->orig)
         {
           mutt_buffer_strcpy(folderbuf, mailbox_path(Context->mailbox));
           mutt_buffer_pretty_mailbox(folderbuf);
@@ -2441,7 +2440,7 @@ int mutt_index_menu(struct MuttWindow *dlg)
         else
         {
           if (C_ChangeFolderNext && Context && Context->mailbox &&
-              !mutt_buffer_is_empty(&Context->mailbox->pathbuf))
+              Context->mailbox->path->orig)
           {
             mutt_buffer_strcpy(folderbuf, mailbox_path(Context->mailbox));
             mutt_buffer_pretty_mailbox(folderbuf);
