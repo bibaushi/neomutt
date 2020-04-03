@@ -433,26 +433,6 @@ uint64_t mutt_date_epoch_ms(void)
 }
 
 /**
- * mutt_date_is_day_name - Is the string a valid day name
- * @param s String to check
- * @retval true It's a valid day name
- *
- * @note Only the first three characters are checked
- * @note The comparison is case insensitive
- */
-bool mutt_date_is_day_name(const char *s)
-{
-  if (!s || (strlen(s) < 3) || (s[3] == '\0') || !IS_SPACE(s[3]))
-    return false;
-
-  for (int i = 0; i < mutt_array_size(Weekdays); i++)
-    if (mutt_str_startswith(s, Weekdays[i], CASE_IGNORE))
-      return true;
-
-  return false;
-}
-
-/**
  * mutt_date_parse_date - Parse a date string in RFC822 format
  * @param[in]  s      String to parse
  * @param[out] tz_out Pointer to timezone (optional)
@@ -470,7 +450,7 @@ time_t mutt_date_parse_date(const char *s, struct Tz *tz_out)
 
   bool obsolete = false;
 
-  regmatch_t *match = mutt_prex_capture(PREX_RFC5322_DATE, s);
+  const regmatch_t *match = mutt_prex_capture(PREX_RFC5322_DATE, s);
   if (!match)
   {
     match = mutt_prex_capture(PREX_RFC5322_DATE_CFWS, s);
