@@ -1,0 +1,232 @@
+From 53a1b4ceeed7b14cdd5b8f4b4ae39143cbef2985 Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Thu, 9 Apr 2020 11:22:07 -0700
+Subject: [PATCH 09/19] Convert "non-fatal" handler errors to return 1 instead
+ of -1.
+
+When displaying a message, display a mutt_error() to warn of
+incomplete rendering.
+
+Fix mutt_copy_message() to check for ferror and feof errors on partial
+decode too.
+
+Clean up _mutt_append_message() to not pass a partial-decode along as
+a success.
+
+Modify the crypt handlers to return 1 if any kind of state message is
+displayed.  There is some fuzzyness about what a "fatal" error is, but
+for now just consider a handler error that notifies by
+state_attach_puts() as "non-fatal".
+---
+ commands.c    | 12 ++++++++++++
+ copy.c        | 17 +++++++++++++----
+ crypt-gpgme.c | 14 ++++++--------
+ handler.c     |  4 ++--
+ pgp.c         | 18 ++++++++++++------
+ smime.c       |  2 +-
+ 6 files changed, 46 insertions(+), 21 deletions(-)
+
+diff --git a/commands.c b/commands.c
+index dc4942c3..08c767e7 100644
+--- a/commands.c
++++ b/commands.c
+@@ -262,6 +262,18 @@ int mutt_display_message (HEADER *cur)
+     goto cleanup;
+   }
+ 
++  if (res > 0)
++  {
++    /* L10N:
++       Before displaying a message in the pager, Mutt iterates through
++       all the message parts, decoding, converting, running autoview,
++       decrypting, etc.  If there is an error somewhere in there, Mutt
++       will still display what it was able to generate, but will also
++       display this message in the message line.
++    */
++    mutt_error (_("There was an error displaying all or part of the message"));
++  }
++
+   if (fpfilterout != NULL && mutt_wait_filter (filterpid) != 0)
+     mutt_any_key_to_continue (NULL);
+ 
+diff --git a/copy.c b/copy.c
+index 9e6feffe..5e84b717 100644
+--- a/copy.c
++++ b/copy.c
+@@ -729,8 +729,14 @@ _mutt_copy_message (FILE *fpout, FILE *fpin, HEADER *hdr, BODY *body,
+   return rc;
+ }
+ 
+-/* should be made to return -1 on fatal errors, and 1 on non-fatal errors
+- * like partial decode, where it is worth displaying as much as possible */
++/* Returns:
++ *    0 on success
++ *   -1 on a fatal error
++ *    1 on a partial decode, or errors that are still deemed viewable
++ *      by mutt_display_message() (such as decryption errors).
++ * Callers besides mutt_display_message should consider rc != 0 as
++ * failure.
++ */
+ int
+ mutt_copy_message (FILE *fpout, CONTEXT *src, HEADER *hdr, int flags,
+ 		   int chflags)
+@@ -740,8 +746,8 @@ mutt_copy_message (FILE *fpout, CONTEXT *src, HEADER *hdr, int flags,
+ 
+   if ((msg = mx_open_message (src, hdr->msgno)) == NULL)
+     return -1;
+-  if ((r = _mutt_copy_message (fpout, msg->fp, hdr, hdr->content, flags, chflags)) == 0
+-      && (ferror (fpout) || feof (fpout)))
++  r = _mutt_copy_message (fpout, msg->fp, hdr, hdr->content, flags, chflags);
++  if ((r >= 0) && (ferror (fpout) || feof (fpout)))
+   {
+     dprint (1, (debugfile, "_mutt_copy_message failed to detect EOF!\n"));
+     r = -1;
+@@ -779,6 +785,9 @@ _mutt_append_message (CONTEXT *dest, FILE *fpin, CONTEXT *src, HEADER *hdr,
+     chflags |= CH_FROM | CH_FORCE_FROM;
+   chflags |= (dest->magic == MUTT_MAILDIR ? CH_NOSTATUS : CH_UPDATE);
+   r = _mutt_copy_message (msg->fp, fpin, hdr, body, flags, chflags);
++  /* Partial decode is still an error. */
++  if (r != 0)
++    r = -1;
+   if (mx_commit_message (msg, dest) != 0)
+     r = -1;
+ 
+diff --git a/crypt-gpgme.c b/crypt-gpgme.c
+index a3c2bb6d..bc8736b4 100644
+--- a/crypt-gpgme.c
++++ b/crypt-gpgme.c
+@@ -2861,6 +2861,7 @@ int pgp_gpgme_application_handler (BODY *m, STATE *s)
+                             _("Error: decryption/verification failed: %s\n"),
+                             gpgme_strerror (err));
+                   state_puts (errbuf, s);
++                  err = 1;
+                 }
+               else
+                 { /* Decryption/Verification succeeded */
+@@ -3019,7 +3020,7 @@ int pgp_gpgme_encrypted_handler (BODY *a, STATE *s)
+       if (s->flags & MUTT_DISPLAY)
+         state_attach_puts (_("[-- Error: could not create temporary file! "
+                              "--]\n"), s);
+-      rc = -1;
++      rc = 1;
+       goto cleanup;
+     }
+ 
+@@ -3087,12 +3088,7 @@ int pgp_gpgme_encrypted_handler (BODY *a, STATE *s)
+     }
+   else
+     {
+-      if (!option (OPTAUTOCRYPTGPGME))
+-        {
+-          mutt_error _("Could not decrypt PGP message");
+-          mutt_sleep (2);
+-        }
+-      rc = -1;
++      rc = 1;
+     }
+ 
+   safe_fclose (&fpout);
+@@ -3130,7 +3126,7 @@ int smime_gpgme_application_handler (BODY *a, STATE *s)
+       if (s->flags & MUTT_DISPLAY)
+         state_attach_puts (_("[-- Error: could not create temporary file! "
+                              "--]\n"), s);
+-      rc = -1;
++      rc = 1;
+       goto cleanup;
+     }
+ 
+@@ -3203,6 +3199,8 @@ int smime_gpgme_application_handler (BODY *a, STATE *s)
+ 
+       mutt_free_body (&tattach);
+     }
++  else
++    rc = 1;
+ 
+   safe_fclose (&fpout);
+   mutt_unlink(mutt_b2s (tempfile));
+diff --git a/handler.c b/handler.c
+index eb98eeff..a397428a 100644
+--- a/handler.c
++++ b/handler.c
+@@ -1140,7 +1140,7 @@ static int alternative_handler (BODY *a, STATE *s)
+     /* didn't find anything that we could display! */
+     state_mark_attach (s);
+     state_puts(_("[-- Error:  Could not display any parts of Multipart/Alternative! --]\n"), s);
+-    rc = -1;
++    rc = 1;
+   }
+ 
+   if (mustfree)
+@@ -1373,7 +1373,7 @@ static int autoview_handler (BODY *a, STATE *s)
+ 	state_mark_attach (s);
+ 	state_printf (s, _("[-- Can't run %s. --]\n"), mutt_b2s (command));
+       }
+-      rc = -1;
++      rc = 1;
+       goto bail;
+     }
+ 
+diff --git a/pgp.c b/pgp.c
+index a3095a9f..3d1d7673 100644
+--- a/pgp.c
++++ b/pgp.c
+@@ -1022,7 +1022,6 @@ BODY *pgp_decrypt_part (BODY *a, STATE *s, FILE *fpout, BODY *p)
+       p->goodsig = 1;
+     else
+       p->goodsig = 0;
+-    state_attach_puts (_("[-- End of PGP output --]\n\n"), s);
+   }
+   safe_fclose (&pgperr);
+ 
+@@ -1153,7 +1152,7 @@ int pgp_encrypted_handler (BODY *a, STATE *s)
+   BUFFER *tempfile = NULL;
+   FILE *fpout, *fpin;
+   BODY *tattach;
+-  int rc = -1;
++  int rc = 1;
+ 
+   tempfile = mutt_buffer_pool_get ();
+   mutt_buffer_mktemp (tempfile);
+@@ -1164,9 +1163,15 @@ int pgp_encrypted_handler (BODY *a, STATE *s)
+     goto cleanup;
+   }
+ 
+-  if (s->flags & MUTT_DISPLAY) crypt_current_time (s, "PGP");
++  if (s->flags & MUTT_DISPLAY)
++    crypt_current_time (s, "PGP");
+ 
+-  if ((tattach = pgp_decrypt_part (a, s, fpout, a)) != NULL)
++  tattach = pgp_decrypt_part (a, s, fpout, a);
++
++  if (s->flags & MUTT_DISPLAY)
++    state_attach_puts (_("[-- End of PGP output --]\n\n"), s);
++
++  if (tattach != NULL)
+   {
+     if (s->flags & MUTT_DISPLAY)
+     {
+@@ -1222,8 +1227,9 @@ int pgp_encrypted_handler (BODY *a, STATE *s)
+   }
+   else
+   {
+-    mutt_error _("Could not decrypt PGP message");
+-    mutt_sleep (2);
++    if (s->flags & MUTT_DISPLAY)
++      state_attach_puts (_("[-- Error: decryption failed --]\n\n"), s);
++
+     /* void the passphrase, even if it's not necessarily the problem */
+     pgp_void_passphrase ();
+   }
+diff --git a/smime.c b/smime.c
+index 84b85358..04aa4d44 100644
+--- a/smime.c
++++ b/smime.c
+@@ -2195,7 +2195,7 @@ bail:
+ 
+ int smime_application_smime_handler (BODY *m, STATE *s)
+ {
+-  int rv = -1;
++  int rv = 1;
+   BODY *tattach;
+ 
+   /* clear out any mime headers before the handler, so they can't be

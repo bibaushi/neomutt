@@ -1,0 +1,35 @@
+From 15ef4a130c8c1fb8ea9a580892f327c1c78ed414 Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Fri, 10 Apr 2020 14:30:11 -0700
+Subject: [PATCH 14/19] Document multipart/alternative inline part disposition
+ for counting.
+
+An initial multipart/alternative's top-level inline parts are also
+counted via the "root" disposition.
+---
+ doc/manual.xml.head | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/doc/manual.xml.head b/doc/manual.xml.head
+index 1ece5904..d0e36783 100644
+--- a/doc/manual.xml.head
++++ b/doc/manual.xml.head
+@@ -8394,10 +8394,14 @@ type &mdash; either <literal>inline</literal> or
+ </para>
+ 
+ <para>
+-A first (or only) inline part of a message or multipart is considered
+-a <quote>root</quote> part, and is counted separately than other
+-inline parts.  Specify <literal>root</literal> or <literal>R</literal>
+-for <emphasis>disposition</emphasis> to count these as attachments.
++The first part of a message or multipart group, if inline, is counted
++separately than other inline parts.  Specify <literal>root</literal>
++or <literal>R</literal> for <emphasis>disposition</emphasis> to count
++these as attachments.  If this first part is of type
++multipart/alternative, note that its top-level inline parts are also
++counted via <literal>root</literal> <emphasis>disposition</emphasis>
++(if <link linkend="count-alternatives">$count_alternatives</link> is
++set).
+ </para>
+ 
+ <para>

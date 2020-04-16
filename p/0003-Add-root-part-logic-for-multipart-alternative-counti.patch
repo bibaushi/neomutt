@@ -1,0 +1,86 @@
+From ed2567d1197df369f20747fc18dba7ea50f2b1ab Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Thu, 2 Apr 2020 20:05:01 -0700
+Subject: [PATCH 03/19] Add "root" part logic for multipart/alternative
+ counting
+
+Distinguish between the inline parts of a root multipart/alternative,
+which should also be considered as "root" parts, and those of a
+non-root multipart/alternative, which should be counted as "inline"
+parts.
+---
+ mutt.h  |  5 ++++-
+ parse.c | 22 +++++++++++++++++++---
+ 2 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/mutt.h b/mutt.h
+index f710d94d..0d58e276 100644
+--- a/mutt.h
++++ b/mutt.h
+@@ -1172,7 +1172,10 @@ typedef struct
+   char *orig_str;
+ } mbchar_table;
+ 
+-#define MUTT_PARTS_TOPLEVEL	(1<<0)	/* is the top-level part */
++/* flags for count_body_parts() */
++#define MUTT_PARTS_TOPLEVEL      (1<<0) /* is the top-level part */
++#define MUTT_PARTS_ROOT_MPALT    (1<<1) /* root multipart/alternative */
++#define MUTT_PARTS_NONROOT_MPALT (1<<2) /* non-root multipart/alternative */
+ 
+ #include "send.h"
+ #include "ascii.h"
+diff --git a/parse.c b/parse.c
+index 52004408..063d8ee1 100644
+--- a/parse.c
++++ b/parse.c
+@@ -1713,7 +1713,7 @@ static int count_body_parts_check(LIST **checklist, BODY *b, int dflt)
+ static int count_body_parts (BODY *body, int flags)
+ {
+   int count = 0;
+-  int shallcount, shallrecurse;
++  int shallcount, shallrecurse, recurse_flags = 0;
+   BODY *bp;
+ 
+   if (body == NULL)
+@@ -1748,7 +1748,16 @@ static int count_body_parts (BODY *body, int flags)
+       /* Always recurse multiparts, except multipart/alternative. */
+       shallrecurse = 1;
+       if (!ascii_strcasecmp(bp->subtype, "alternative"))
++      {
+         shallrecurse = option (OPTCOUNTALTERNATIVES);
++        /* alternative counting needs to distinguish between a "root"
++         * multipart/alternative and non-root.  See further below.
++         */
++        if (bp == body)
++          recurse_flags |= MUTT_PARTS_ROOT_MPALT;
++        else
++          recurse_flags |= MUTT_PARTS_NONROOT_MPALT;
++      }
+ 
+       /* Don't count containers if they're top-level. */
+       if (flags & MUTT_PARTS_TOPLEVEL)
+@@ -1774,7 +1783,14 @@ static int count_body_parts (BODY *body, int flags)
+       }
+       else
+       {
+-        if (bp == body)
++        /* - root multipart/alternative top-level inline parts are
++         *   also treated as root parts
++         * - nonroot multipart/alternative top-level parts are NOT
++         *   treated as root parts
++         * - otherwise, initial inline parts are considered root
++         */
++        if (((bp == body) && !(flags & MUTT_PARTS_NONROOT_MPALT)) ||
++            (flags & MUTT_PARTS_ROOT_MPALT))
+         {
+           if (!count_body_parts_check(&RootAllow, bp, 1))
+             AT_NOCOUNT("root not allowed");
+@@ -1800,7 +1816,7 @@ static int count_body_parts (BODY *body, int flags)
+     if (shallrecurse)
+     {
+       dprint(5, (debugfile, "cbp: %p pre count = %d\n", (void *)bp, count));
+-      bp->attach_count = count_body_parts(bp->parts, flags & ~MUTT_PARTS_TOPLEVEL);
++      bp->attach_count = count_body_parts(bp->parts, recurse_flags);
+       count += bp->attach_count;
+       dprint(5, (debugfile, "cbp: %p post count = %d\n", (void *)bp, count));
+     }

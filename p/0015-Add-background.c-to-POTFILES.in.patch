@@ -1,0 +1,22 @@
+From 950cc4351aa51067492988d518f0cdf32b42658c Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Mon, 13 Apr 2020 07:00:49 -0700
+Subject: [PATCH 15/19] Add background.c to POTFILES.in.
+
+Thanks to Petr Pisar for pointing out the mistake.
+---
+ po/POTFILES.in | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index 4e991ade..795b6e40 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -7,6 +7,7 @@ autocrypt/autocrypt_acct_menu.c
+ autocrypt/autocrypt_db.c
+ autocrypt/autocrypt_gpgme.c
+ autocrypt/autocrypt_schema.c
++background.c
+ browser.c
+ buffy.c
+ charset.c

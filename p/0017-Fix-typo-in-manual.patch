@@ -1,0 +1,22 @@
+From 61867c9e6c3d2f21f5dbde308a878e50828083bb Mon Sep 17 00:00:00 2001
+From: Vincent Lefevre <vincent@vinc17.net>
+Date: Tue, 14 Apr 2020 01:07:29 +0200
+Subject: [PATCH 17/19] Fix typo in manual.
+
+---
+ doc/manual.xml.head | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/doc/manual.xml.head b/doc/manual.xml.head
+index d0e36783..976350c0 100644
+--- a/doc/manual.xml.head
++++ b/doc/manual.xml.head
+@@ -1803,7 +1803,7 @@ fo-table</literal> for details.
+   One complication with backgrounded compose sessions is the config
+   changes caused by <link linkend="hooks">send, reply, and folder
+   hooks</link>.  These can get triggered by a new message composition
+-  session, or by changing folders during a backgrounded sesssion.  To
++  session, or by changing folders during a backgrounded session.  To
+   help lessen these problems, Mutt takes a snapshot of certain
+   configuration variables and stores them with each editing session
+   when it is backgrounded.  When the session is resumed, those stored

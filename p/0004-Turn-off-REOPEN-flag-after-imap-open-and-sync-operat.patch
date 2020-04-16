@@ -1,0 +1,93 @@
+From a8337951e250d7ea9f0978c04ee73d9f7ba99494 Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Mon, 6 Apr 2020 14:46:53 -0700
+Subject: [PATCH 04/19] Turn off REOPEN flag after imap open and sync
+ operations.
+
+Leaving a just opened imap mailbox with REOPEN set can cause all sorts
+of problems.  Postpone.c had a memory corruption bug because of this.
+The background compose reply-flag setting code had to ensure it was
+turned off too.
+
+The main index worked around this by always ensuring
+mx_check_mailbox() was called right afterwards.  But after researching
+I can't see any reason to leave it open.
+
+imap_sync_mailbox() also leaves the REOPEN set, and I can't see a good
+reason for doing this either.  Both are memory corruption bugs just
+waiting to happen.
+
+With the flag turned off, remove the workaround calls to
+mx_check_mailbox() in postpone.c and send.c.
+---
+ imap/imap.c |  5 ++++-
+ postpone.c  | 12 ------------
+ send.c      |  2 --
+ 3 files changed, 4 insertions(+), 15 deletions(-)
+
+diff --git a/imap/imap.c b/imap/imap.c
+index e19809a6..86569426 100644
+--- a/imap/imap.c
++++ b/imap/imap.c
+@@ -851,6 +851,8 @@ static int imap_open_mailbox (CONTEXT* ctx)
+     goto fail;
+   }
+ 
++  imap_disallow_reopen (ctx);
++
+   dprint (2, (debugfile, "imap_open_mailbox: msgcount is %d\n", ctx->msgcount));
+   FREE (&mx.mbox);
+   return 0;
+@@ -1306,7 +1308,7 @@ int imap_sync_mailbox (CONTEXT* ctx, int expunge, int* index_hint)
+   imap_allow_reopen (ctx);
+ 
+   if ((rc = imap_check_mailbox (ctx, index_hint, 0)) != 0)
+-    return rc;
++    goto out;
+ 
+   /* if we are expunging anyway, we can do deleted messages very quickly... */
+   if (expunge && mutt_bit_isset (ctx->rights, MUTT_ACL_DELETE))
+@@ -1525,6 +1527,7 @@ int imap_sync_mailbox (CONTEXT* ctx, int expunge, int* index_hint)
+   rc = 0;
+ 
+ out:
++  imap_disallow_reopen (ctx);
+   if (appendctx)
+   {
+     mx_fastclose_mailbox (appendctx);
+diff --git a/postpone.c b/postpone.c
+index 19cf61f2..3cbc4d03 100644
+--- a/postpone.c
++++ b/postpone.c
+@@ -249,18 +249,6 @@ int mutt_get_postponed (CONTEXT *ctx, SEND_CONTEXT *sctx)
+     return (-1);
+   }
+ 
+-  /* TODO:
+-   * mx_open_mailbox() for IMAP leaves IMAP_REOPEN_ALLOW set.  For the
+-   * index this is papered-over because it calls mx_check_mailbox()
+-   * every event loop (which resets that flag).
+-   *
+-   * For a stable-branch fix, I'm doing the same here, to prevent
+-   * context changes from occuring behind the scenes and causing
+-   * segvs, but probably the flag needs to be reset after downloading
+-   * headers in imap_open_mailbox().
+-   */
+-  mx_check_mailbox (PostContext, NULL);
+-
+   if (! PostContext->msgcount)
+   {
+     PostCount = 0;
+diff --git a/send.c b/send.c
+index 936cb50e..5c3f75b9 100644
+--- a/send.c
++++ b/send.c
+@@ -2588,8 +2588,6 @@ main_loop:
+         if (ctx)
+         {
+           close_context = 1;
+-          /* TODO: when IMAP_REOPEN_ALLOW setting is fixed this can be removed: */
+-          mx_check_mailbox (ctx, NULL);
+           /* A few connection strings display despite MUTT_QUIET, so refresh. */
+           mutt_message _("Setting reply flags.");
+         }

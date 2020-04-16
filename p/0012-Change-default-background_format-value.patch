@@ -1,0 +1,26 @@
+From 489a81ce968bd1b84775f47b11bb0bf16ccfb310 Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Thu, 9 Apr 2020 20:23:42 -0700
+Subject: [PATCH 12/19] Change default $background_format value.
+
+Move the status before the pid to more clearly separate it the
+from the subject.  Increase the pid width.
+
+Thanks to Aaron Schrab for both suggestions.
+---
+ init.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/init.h b/init.h
+index 50178072..1621f8af 100644
+--- a/init.h
++++ b/init.h
+@@ -398,7 +398,7 @@ struct option_t MuttVars[] = {
+   ** will be prompted to confirm exiting Mutt, in addition to the
+   ** $$quit prompt.
+   */
+-  { "background_format", DT_STR, R_MENU, {.p=&BackgroundFormat}, {.p="%5p %10S %s"} },
++  { "background_format", DT_STR, R_MENU, {.p=&BackgroundFormat}, {.p="%10S %7p %s"} },
+   /*
+   ** .pp
+   ** This variable describes the format of the ``background compose''

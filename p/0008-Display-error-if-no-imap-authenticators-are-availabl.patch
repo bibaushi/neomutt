@@ -1,0 +1,32 @@
+From 4fc97a2026f671a35e3d296bbfdeb3794d6313c7 Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Wed, 8 Apr 2020 09:20:54 -0700
+Subject: [PATCH 08/19] Display error if no imap authenticators are available.
+
+Without SASL enabled, and with an explicit value in
+$imap_authenticators not natively implemented by Mutt, no calls to
+authenticator->authenticate() were occuring.
+
+This resulted in the default r value of -1 passing through, which did
+not trigger the mutt_error() message after the loop.
+
+Without that message, an empty index would display with the
+"connecting" message still on the bottom, giving the appearance that
+Mutt is hung.
+---
+ imap/auth.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/imap/auth.c b/imap/auth.c
+index e32b5ab4..48909cd8 100644
+--- a/imap/auth.c
++++ b/imap/auth.c
+@@ -55,7 +55,7 @@ int imap_authenticate (IMAP_DATA* idata)
+   char* methods;
+   char* method;
+   char* delim;
+-  int r = -1;
++  int r = IMAP_AUTH_UNAVAIL;
+ 
+   if (ImapAuthenticators)
+   {

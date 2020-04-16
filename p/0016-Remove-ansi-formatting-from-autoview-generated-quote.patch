@@ -1,0 +1,112 @@
+From c289e74ca4948cb9d529e038e7ce62718ded52f4 Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Sun, 12 Apr 2020 13:13:43 -0700
+Subject: [PATCH 16/19] Remove ansi formatting from autoview generated quoted
+ replies.
+
+If $allow_ansi is set, and the user has an autoview generating ansi
+output, it is helpful to strip out those sequences.
+
+This is based on Fabian's patch for ticket #218.  My version results
+in partially duplicated logic, but avoids tangling the handler with
+pager's internal fill_buffer() logic.
+---
+ handler.c | 10 +++++++++-
+ muttlib.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ protos.h  |  1 +
+ 3 files changed, 56 insertions(+), 1 deletion(-)
+
+diff --git a/handler.c b/handler.c
+index a397428a..36f4b997 100644
+--- a/handler.c
++++ b/handler.c
+@@ -1379,11 +1379,19 @@ static int autoview_handler (BODY *a, STATE *s)
+ 
+     if (s->prefix)
+     {
++      /* Remove ansi and formatting from autoview output in replies only.
++       * The user may want to see the formatting in the pager, but it
++       * shouldn't be in their quoted reply text too.
++       */
++      BUFFER *stripped = mutt_buffer_pool_get ();
+       while (fgets (buffer, sizeof(buffer), fpout) != NULL)
+       {
++        mutt_buffer_strip_formatting (stripped, buffer);
+         state_puts (s->prefix, s);
+-        state_puts (buffer, s);
++        state_puts (mutt_b2s (stripped), s);
+       }
++      mutt_buffer_pool_release (&stripped);
++
+       /* check for data on stderr */
+       if (fgets (buffer, sizeof(buffer), fperr))
+       {
+diff --git a/muttlib.c b/muttlib.c
+index 653f3390..6efa0452 100644
+--- a/muttlib.c
++++ b/muttlib.c
+@@ -1139,6 +1139,52 @@ void mutt_buffer_sanitize_filename (BUFFER *d, const char *f, short slash)
+   }
+ }
+ 
++static int is_ansi (const char *buf)
++{
++  while (*buf && (isdigit(*buf) || *buf == ';'))
++    buf++;
++  return (*buf == 'm');
++}
++
++/* Removes ANSI and backspace formatting.
++ *
++ * This logic is pulled from the pager fill_buffer() function, for use
++ * in stripping reply-quoted autoview output of ansi sequences.
++ */
++void mutt_buffer_strip_formatting (BUFFER *dest, const char *src)
++{
++  const char *s = src;
++
++  mutt_buffer_clear (dest);
++
++  if (!s)
++    return;
++
++  while (*s)
++  {
++    if (*s == '\010' && (s > src))
++    {
++      if (*(s+1) == '_')	/* underline */
++        s += 2;
++      else if (*(s+1) && mutt_buffer_len (dest))	/* bold or overstrike */
++      {
++        dest->dptr--;
++        mutt_buffer_addch (dest, *(s+1));
++        s += 2;
++      }
++      else			/* ^H */
++        mutt_buffer_addch (dest, *s++);
++    }
++    else if (*s == '\033' && *(s+1) == '[' && is_ansi (s + 2))
++    {
++      while (*s++ != 'm')	/* skip ANSI sequence */
++        ;
++    }
++    else
++      mutt_buffer_addch (dest, *s++);
++  }
++}
++
+ void mutt_expand_file_fmt (BUFFER *dest, const char *fmt, const char *src)
+ {
+   BUFFER *tmp;
+diff --git a/protos.h b/protos.h
+index a12e033b..e1bfe746 100644
+--- a/protos.h
++++ b/protos.h
+@@ -179,6 +179,7 @@ void mutt_buffer_concatn_path (BUFFER *dst, const char *dir, size_t dirlen,
+ #define mutt_buffer_quote_filename(a,b) _mutt_buffer_quote_filename (a, b, 1);
+ void _mutt_buffer_quote_filename (BUFFER *, const char *, int);
+ void mutt_buffer_sanitize_filename (BUFFER *d, const char *f, short slash);
++void mutt_buffer_strip_formatting (BUFFER *dest, const char *src);
+ void mutt_canonical_charset (char *, size_t, const char *);
+ void mutt_check_stats(void);
+ int mutt_count_body_parts (CONTEXT *, HEADER *);

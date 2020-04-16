@@ -1,0 +1,47 @@
+From 8615cae9ab5e00496044c4fc635785b967258f54 Mon Sep 17 00:00:00 2001
+From: Kevin McCarthy <kevin@8t8.us>
+Date: Mon, 6 Apr 2020 15:58:58 -0700
+Subject: [PATCH 06/19] Add message/global to the list of known "message"
+ types.
+
+This will allow Mutt to at least handle those messages the same as
+message/rfc822 body types.
+---
+ mime.h       | 8 +++++---
+ recvattach.c | 4 +++-
+ 2 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/mime.h b/mime.h
+index 0a1ceca9..82125ab3 100644
+--- a/mime.h
++++ b/mime.h
+@@ -64,9 +64,11 @@ extern const char B64Chars[];
+ #define base64val(c) Index_64[(unsigned int)(c)]
+ 
+ #define is_multipart(x)                                                 \
+-  ((x)->type == TYPEMULTIPART                                           \
+-   || ((x)->type == TYPEMESSAGE && (!strcasecmp((x)->subtype, "rfc822") \
+-   || !strcasecmp((x)->subtype, "news"))))
++  ((x)->type == TYPEMULTIPART  ||                                       \
++  ((x)->type == TYPEMESSAGE &&                                          \
++   (!ascii_strcasecmp((x)->subtype, "rfc822") ||                        \
++    !ascii_strcasecmp((x)->subtype, "news")   ||                        \
++    !ascii_strcasecmp((x)->subtype, "global"))))
+ 
+ extern const char *BodyTypes[];
+ extern const char *BodyEncodings[];
+diff --git a/recvattach.c b/recvattach.c
+index 0d3fa147..2cf1a180 100644
+--- a/recvattach.c
++++ b/recvattach.c
+@@ -390,7 +390,9 @@ int mutt_is_message_type (int type, const char *subtype)
+     return 0;
+ 
+   subtype = NONULL(subtype);
+-  return (ascii_strcasecmp (subtype, "rfc822") == 0 || ascii_strcasecmp (subtype, "news") == 0);
++  return (ascii_strcasecmp (subtype, "rfc822") == 0 ||
++          ascii_strcasecmp (subtype, "news") == 0 ||
++          ascii_strcasecmp (subtype, "global") == 0);
+ }
+ 
+ /*
