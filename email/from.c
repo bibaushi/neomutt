@@ -82,8 +82,14 @@ bool is_from(const char *s, char *path, size_t pathlen, time_t *tp)
     tm.tm_mon = mutt_date_check_month(s + mutt_regmatch_start(mmonth));
     sscanf(s + mutt_regmatch_start(mday), " %d", &tm.tm_mday);
     sscanf(s + mutt_regmatch_start(mtime), "%d:%d:%d", &tm.tm_hour, &tm.tm_min, &tm.tm_sec);
-    sscanf(s + mutt_regmatch_start(myear), "%d", &tm.tm_year);
-    tm.tm_year -= 1900;
+    int year = 0;
+    sscanf(s + mutt_regmatch_start(myear), "%d", &year);
+    if (year > 1900)
+      tm.tm_year = year - 1900;
+    else if (year < 70)
+      tm.tm_year = year + 100;
+    else
+      tm.tm_year = year;
     *tp = mutt_date_make_time(&tm, false);
   }
 

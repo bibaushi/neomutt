@@ -231,7 +231,11 @@ static struct PrexStorage *prex(enum Prex which)
         ":[[:digit:]]{2})"
       ")"
       " "
-      PREX_YEAR                 // Year
+      "("
+        PREX_YEAR               // Year (YYYY)
+        "|"
+        "([[:digit:]]{2})"      // Year (YY)
+      ")"
     }
     /* clang-format on */
   };
