@@ -156,8 +156,8 @@ static struct PrexStorage *prex(enum Prex which)
         ")"
     },
     {
-      PREX_RFC5322_DATE_CFWS,
-      PREX_RFC5322_DATE_CFWS_MATCH_MAX,
+      PREX_RFC5322_DATE_LAX,
+      PREX_RFC5322_DATE_LAX_MATCH_MAX,
       /* Spec: https://tools.ietf.org/html/rfc5322#section-3.3 */
 #define FWS " *"
 #define C "(\\(.*\\))?"
@@ -197,12 +197,12 @@ static struct PrexStorage *prex(enum Prex which)
       "^From "                 // From
       "([^[:space:]]+) +"      // Sender
       PREX_DOW                 // Day of week
-      " "
+      " +"
       PREX_MONTH               // Month
       " ( ([[:digit:]])|([[:digit:]]{2}))" // Day
-      " "
+      " +"
       PREX_TIME                // Time
-      " "
+      " +"
       PREX_YEAR                // Year
     },
     {
@@ -214,23 +214,23 @@ static struct PrexStorage *prex(enum Prex which)
         "[^[:space:]]+"         // Sender
         "( at [^[:space:]]+)?" // Possibly obfuscated, pipermail-style
       ")?"
-      " ?"
+      " *"
       PREX_DOW_NOCASE           // Day of week
-      " "
+      " +"
       PREX_MONTH                // Month
-      " "
+      " +"
       "( "                      // Day
         "([[:digit:]])|"
         "([[:digit:]]{2})"
       ")"
-      " "
+      " +"
       "("
         PREX_TIME               // Time (HH:MM:SS)
         "|"
         "([[:digit:]]{2}"       // Time (HH:MM)
         ":[[:digit:]]{2})"
       ")"
-      " "
+      " +"
       "([[:alpha:] ]*)"         // Timezone (which we skip)
       "("
         PREX_YEAR               // Year (YYYY)
