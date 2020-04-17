@@ -195,7 +195,7 @@ static struct PrexStorage *prex(enum Prex which)
       PREX_MBOX_FROM_MATCH_MAX,
       /* Spec: http://qmail.omnis.ch/man/man5/mbox.html */
       "^From "                 // From
-      "([^[:space:]]+) "       // Sender
+      "([^[:space:]]+) +"      // Sender
       PREX_DOW                 // Day of week
       " "
       PREX_MONTH               // Month
