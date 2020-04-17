@@ -455,9 +455,12 @@ time_t mutt_date_parse_date(const char *s, struct Tz *tz_out)
   {
     match = mutt_prex_capture(PREX_RFC5322_DATE_CFWS, s);
     if (!match)
+    {
+      mutt_error(_("Could not parse date: <%s>"), s);
       return -1;
+    }
     obsolete = true;
-    mutt_debug(LL_DEBUG2, "Fallback to obsolete RFC5322 dates regex\n");
+    mutt_debug(LL_DEBUG2, "Fallback regex for date: <%s>\n", s);
   }
 
   struct tm tm = { 0 };

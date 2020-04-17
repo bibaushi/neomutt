@@ -56,9 +56,12 @@ bool is_from(const char *s, char *path, size_t pathlen, time_t *tp)
   {
     match = mutt_prex_capture(PREX_MBOX_FROM_LAX, s);
     if (!match)
+    {
+      mutt_error(_("Could not parse From line: <%s>"), s);
       return false;
+    }
     lax = true;
-    mutt_debug(LL_DEBUG2, "Fallback to lax From regex\n");
+    mutt_debug(LL_DEBUG2, "Fallback regex for From line: <%s>\n", s);
   }
 
   if (path)
