@@ -93,6 +93,12 @@ static struct IsFromTest test[] = {
     "god@heaven.af.mil",
     1587085526
   },
+  {
+    "From god@heaven.af.mil Sat Jan  3 01:05:34 MET DST 1996",
+    true,
+    "god@heaven.af.mil",
+    820631134
+  },
 };
 
 // clang-format on
